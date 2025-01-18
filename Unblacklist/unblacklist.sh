@@ -24,7 +24,7 @@ function validateIpAddress() {
 		IFS='.'
 		
 		# Assign the value of the IP address to itself inside parenthesis in order to return an array
-		ip=($ip)
+		ip=("$ip")
 		
 		# Restore the IFS to bash original value
 		IFS=$IFS_temp
@@ -45,7 +45,7 @@ function validateIpAddress() {
 #
 function getDBPassword() {
 	# Get the password from 3CX File
-	DBPassword=`grep MasterDBPassword /var/lib/3cxpbx/Bin/3CXPhoneSystem.ini|cut -d' ' -f3`
+	DBPassword=$(grep MasterDBPassword /var/lib/3cxpbx/Bin/3CXPhoneSystem.ini|cut -d' ' -f3)
 	
 	if [[ $? -eq 1 ]]; then
 		echo "I was unable to read the phonesystem user password."
@@ -60,8 +60,8 @@ function getDBPassword() {
 # checkIpAddress ip_add
 function deleteIpAddress() {
     getDBPassword
-	psql postgresql://phonesystem:$DBPassword@127.0.0.1/database_single << EOF
-delete from blacklist where ipaddr = '$ip_addr';
+    psql postgresql://phonesystem:"$DBPassword"@127.0.0.1/database_single << EOF
+DELETE FROM blacklist WHERE ipaddr = '$1';
 EOF
 }
 
@@ -73,7 +73,7 @@ EOF
 ###########
 # Ask for the IP address to delete
 echo "unblacklist \V0.1b\ - March 2019"
-read -p "Enter the IP address to remove from the blacklisted database: " ip_addr
+read -rp "Enter the IP address to remove from the blacklisted database: " ip_addr
 
 # IP address check
 if [[ $(validateIpAddress "$ip_addr") -eq 1 ]]; then
@@ -82,7 +82,7 @@ if [[ $(validateIpAddress "$ip_addr") -eq 1 ]]; then
 fi
 
 # Look for the IP address in the database and delete it
-deleteIpAddress $ip_addr
+deleteIpAddress "$ip_addr"
 
 echo "If this was successful, you must restart the phone system MC01 service by entering the following command:"
 echo "service 3CXPhoneSystemMC01 restart"
