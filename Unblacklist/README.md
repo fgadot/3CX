@@ -11,3 +11,7 @@ Down the road, we might switch to Python or Perl..
 # 2023.03.01 - No more maintenance
 Due to the disaster the latest 3CX V18U6 has been, we decided to move our customers away from 3CX to FreePBX
 Therefore, this shell script won't be maintained anymore. Feel free to fork!
+
+# 2026.01.31 - Update request
+Someone reached out to me because they were uncomfortable restarting 3CXPhoneSystemMC01 service. 
+Modified the code so it does it by itself if removal of IP Address was successful. ó
