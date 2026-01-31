@@ -55,14 +55,37 @@ function getDBPassword() {
 
 
 
-# Check if the IP address is actually in the blacklisted database
-# Usage:
-# checkIpAddress ip_add
+# Check if IP address exists in blacklist
+# Usage: checkIpAddress ip_addr
+# Returns 0 if IP exists, 1 if not found
+function checkIpAddress() {
+    getDBPassword
+    local count=$(psql postgresql://phonesystem:"$DBPassword"@127.0.0.1/database_single -t -c "SELECT COUNT(*) FROM blacklist WHERE ipaddr = '$1';" | tr -d ' ')
+    [[ $count -gt 0 ]] && echo 0 || echo 1
+}
+
+# Delete IP address from blacklist
+# Usage: deleteIpAddress ip_addr
+# Returns 0 if deletion successful, 1 if failed
 function deleteIpAddress() {
     getDBPassword
-    psql postgresql://phonesystem:"$DBPassword"@127.0.0.1/database_single << EOF
-DELETE FROM blacklist WHERE ipaddr = '$1';
-EOF
+    local result=$(psql postgresql://phonesystem:"$DBPassword"@127.0.0.1/database_single -t -c "DELETE FROM blacklist WHERE ipaddr = '$1' RETURNING 1;" | tr -d ' ')
+    [[ -n "$result" ]] && echo 0 || echo 1
+}
+
+# Restart 3CX service if deletion was successful
+# Usage: restartService
+function restartService() {
+    echo "Restarting 3CX Phone System MC01 service..."
+    if sudo service 3CXPhoneSystemMC01 restart; then
+        echo "Service restarted successfully."
+        echo "You may now try to re-login through the web interface."
+        return 0
+    else
+        echo "Failed to restart service. Please restart manually with:"
+        echo "sudo service 3CXPhoneSystemMC01 restart"
+        return 1
+    fi
 }
 
 
@@ -81,9 +104,29 @@ if [[ $(validateIpAddress "$ip_addr") -eq 1 ]]; then
 	exit
 fi
 
-# Look for the IP address in the database and delete it
-deleteIpAddress "$ip_addr"
+# Check if IP address exists in database before deletion
+if [[ $(checkIpAddress "$ip_addr") -eq 1 ]]; then
+    echo "IP address $ip_addr is not found in the blacklist database."
+    exit 1
+fi
 
-echo "If this was successful, you must restart the phone system MC01 service by entering the following command:"
-echo "service 3CXPhoneSystemMC01 restart"
-echo "Once the service is restarted, you may try to re-login through the web interface"
+# Delete the IP address and check if successful
+if [[ $(deleteIpAddress "$ip_addr") -eq 0 ]]; then
+    echo "Successfully removed $ip_addr from the blacklist."
+    
+    # Ask user if they want to restart the service
+    read -rp "Do you want to restart the 3CX Phone System MC01 service now? (y/N): " restart_choice
+    case "$restart_choice" in
+        [yY]|[yY][eE][sS])
+            restartService
+            ;;
+        *)
+            echo "Service not restarted. You can restart manually with:"
+            echo "sudo service 3CXPhoneSystemMC01 restart"
+            echo "Once the service is restarted, you may try to re-login through the web interface."
+            ;;
+    esac
+else
+    echo "Failed to remove $ip_addr from the blacklist. Please check database connection and permissions."
+    exit 1
+fi
